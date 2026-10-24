@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.os.SystemClock
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
 /**
@@ -40,6 +42,8 @@ class TunnelService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var foreground = false
     private var stopping = false
+    @Volatile private var coreHung = false
+    @Volatile private var pendingStart = false
     @Volatile private var networkChanged = false
     @Volatile private var restartRequested = false
     @Volatile private var coreDied = false
@@ -106,7 +110,13 @@ class TunnelService : VpnService() {
 
     private fun startSession() {
         promote()
-        if (stopping || job?.isActive == true) return
+        if (stopping) {
+            // A disconnect is still closing the old core; start again as soon as it is done.
+            pendingStart = true
+            Engine.status.value = Status(Phase.CONNECTING, 1)
+            return
+        }
+        if (job?.isActive == true) return
         Tester.cancel()
         Engine.logs.value = emptyList()
         Engine.lastReason.value = null
@@ -125,15 +135,42 @@ class TunnelService : VpnService() {
     private fun stopSession() {
         if (stopping) return
         stopping = true
-        Engine.status.value = Status(Phase.STOPPING)
+        // Instant disconnect: the app shows "disconnected" and the notification goes away at once;
+        // the core and the TUN are closed right behind it (normally well under a second).
+        job?.cancel()
+        statsJob?.cancel()
+        Engine.resetLive()
+        Engine.status.value = Status(Phase.IDLE)
+        foreground = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
         scope.launch {
-            // Cancel first so the run loop cannot start a new core, then close the core and the TUN
-            // right away: the VPN key icon disappears immediately.
-            job?.cancel()
-            withContext(Dispatchers.IO) { stopTunSide() }
-            job?.join()
-            finish(null)
-            stopping = false
+            try {
+                val stopped = stopCoreBounded(3000)
+                withTimeoutOrNull(1500) { job?.join() }
+                unwatchNetwork()
+                releaseLocks()
+                Totals.add(this@TunnelService, sessionRx, sessionTx)
+                sessionRx = 0
+                sessionTx = 0
+                if (pendingStart && stopped) {
+                    // The user tapped Connect while the old core was closing: carry on with a new session.
+                    pendingStart = false
+                    stopping = false
+                    startSession()
+                } else {
+                    pendingStart = false
+                    stopSelf()
+                    if (!stopped) {
+                        Engine.log("The core did not stop in time: restarting the app process")
+                        // The service (and this scope) is gone after stopSelf(), so the kill is posted outside it.
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                            { android.os.Process.killProcess(android.os.Process.myPid()) }, 600
+                        )
+                    }
+                }
+            } finally {
+                stopping = false
+            }
         }
     }
 
@@ -470,27 +507,53 @@ class TunnelService : VpnService() {
     // --------------------------------------------------------------- teardown
 
     private suspend fun teardown() {
-        withContext(Dispatchers.IO) { teardownBlocking() }
+        unwatchNetwork()
+        stopCoreBounded(4000)
+        releaseLocks()
     }
 
-    /** Stops the core and closes the TUN. Safe to call twice. */
-    @Synchronized
+    /**
+     * Closes the TUN and stops the core on a plain thread and waits at most [ms]. Returns false when the
+     * core did not finish in time (the native close can block), so callers never hang on it.
+     */
+    private suspend fun stopCoreBounded(ms: Long): Boolean {
+        if (coreHung) return false
+        val done = CompletableDeferred<Unit>()
+        Thread({
+            try { stopTunSide() } finally { done.complete(Unit) }
+        }, "8ray-stop").start()
+        val ok = withTimeoutOrNull(ms) { done.await() } != null
+        if (!ok) coreHung = true
+        return ok
+    }
+
+    /** Closes the TUN first (the VPN key icon disappears), then stops the core. Safe to call twice. */
     private fun stopTunSide() {
         statsJob?.cancel()
         statsJob = null
-        runCatching { SingBox.stopIf(token) }
         SingBox.onStop = null
-        runCatching { tun?.close() }
+        val t = tun
         tun = null
+        runCatching { t?.close() }
+        runCatching { SingBox.stopIf(token) }
     }
 
-    private fun teardownBlocking() {
-        unwatchNetwork()
-        stopTunSide()
+    private fun releaseLocks() {
         wake?.let { if (it.isHeld) it.release() }
         wake = null
         wifi?.let { if (it.isHeld) it.release() }
         wifi = null
+    }
+
+    /** Used from onDestroy (main thread): never wait more than a moment. */
+    private fun teardownBlocking() {
+        unwatchNetwork()
+        if (!coreHung) {
+            val t = Thread({ stopTunSide() }, "8ray-stop")
+            t.start()
+            runCatching { t.join(1500) }
+        }
+        releaseLocks()
     }
 
     private fun acquireWake(s: Settings) {
