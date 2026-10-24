@@ -146,129 +146,182 @@ private object ManualBuilder {
     }
 }
 
+/** State of the manual form: every field by key, plus the current error. */
+private class FormState {
+    val f = mutableStateMapOf<String, String>()
+    var err by mutableStateOf<String?>(null)
+    fun v(k: String, d: String): String = f[k] ?: d
+    fun put(k: String, value: String) { f[k] = value; err = null }
+}
+
+@Composable
+private fun FText(st: FormState, label: String, k: String, hint: String) {
+    TextRow(label, st.v(k, ""), hint) { st.put(k, it) }
+}
+
+@Composable
+private fun FChoice(st: FormState, label: String, k: String, opts: List<String>) {
+    Label(label)
+    Chips(opts.map { it to it }, st.v(k, opts[0]), scroll = true) { st.put(k, it) }
+}
+
+@Composable
+private fun FSwitch(st: FormState, label: String, k: String) {
+    SwitchRow(label, st.v(k, "0") == "1") { st.put(k, if (it) "1" else "0") }
+}
+
+@Composable
+private fun TransportFields(st: FormState) {
+    FChoice(st, "Transport", "net", listOf("tcp", "ws", "grpc", "httpupgrade", "http"))
+    val net = st.v("net", "tcp")
+    if (net == "ws" || net == "httpupgrade" || net == "http") {
+        FText(st, "Host", "wshost", "")
+        FText(st, "Path", "path", "/")
+    }
+    if (net == "grpc") FText(st, "Service name", "service", "")
+}
+
+@Composable
+private fun SecurityFields(st: FormState, opts: List<String>) {
+    FChoice(st, "Security", "sec", opts)
+    val sec = st.v("sec", opts[0])
+    if (sec != "none") {
+        FText(st, "SNI", "sni", "")
+        FChoice(st, "Fingerprint", "fp", FPS)
+        FText(st, "ALPN", "alpn", "h2,http/1.1")
+        FSwitch(st, "Allow insecure", "insecure")
+    }
+    if (sec == "reality") {
+        FText(st, "Public key (pbk)", "pbk", "")
+        FText(st, "Short ID (sid)", "sid", "")
+    }
+}
+
 /** Manual entry: a form for every supported protocol, or free text (share links, subscription URL, sing-box JSON). */
 @Composable
 fun ManualDialog(onDismiss: () -> Unit, onOk: (String) -> Unit) {
     val ctx = LocalContext.current
     var mode by remember { mutableStateOf("vless") }
-    val f = remember { mutableStateMapOf<String, String>() }
+    val st = remember { FormState() }
     var text by remember { mutableStateOf("") }
-    var err by remember { mutableStateOf<String?>(null) }
     val missing = stringResource(R.string.manual_missing)
-
-    fun v(k: String, d: String = "") = f[k] ?: d
-    @Composable fun T(label: String, k: String, hint: String = "") = TextRow(label, v(k), hint) { f[k] = it; err = null }
-    @Composable fun Pw(label: String, k: String) = TextRow(label, v(k)) { f[k] = it; err = null }
-    @Composable fun Ch(label: String, k: String, opts: List<String>, d: String = opts[0]) {
-        Label(label)
-        Chips(opts.map { it to it }, v(k, d), scroll = true) { f[k] = it; err = null }
-    }
-    @Composable fun Sw(label: String, k: String) = SwitchRow(label, v(k) == "1") { f[k] = if (it) "1" else "0"; err = null }
-
-    @Composable fun Transport() {
-        Ch("Transport", "net", listOf("tcp", "ws", "grpc", "httpupgrade", "http"))
-        val net = v("net", "tcp")
-        if (net in setOf("ws", "httpupgrade", "http")) { T("Host", "wshost"); T("Path", "path", "/") }
-        if (net == "grpc") T("Service name", "service")
-    }
-    @Composable fun Security(opts: List<String>) {
-        Ch("Security", "sec", opts)
-        val sec = v("sec", opts[0])
-        if (sec != "none") {
-            T("SNI", "sni")
-            Ch("Fingerprint", "fp", FPS)
-            T("ALPN", "alpn", "h2,http/1.1")
-            Sw("Allow insecure", "insecure")
-        }
-        if (sec == "reality") { T("Public key (pbk)", "pbk"); T("Short ID (sid)", "sid") }
-    }
+    val protoOptions = PROTOS.map { it.first to if (it.first == "text") stringResource(R.string.manual_text) else it.second }
+    val pass = stringResource(R.string.manual_pass)
+    val user = stringResource(R.string.manual_user)
 
     AlertDialog(
         onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = { Text(stringResource(R.string.add_manual), fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Chips(PROTOS.map { it.first to if (it.first == "text") stringResource(R.string.manual_text) else it.second }, mode, scroll = true) { mode = it; err = null }
+                Chips(protoOptions, mode, scroll = true) { mode = it; st.err = null }
                 if (mode == "text") {
                     Hint(stringResource(R.string.add_manual_hint))
-                    TextRow("", text, singleLine = false) { text = it; err = null }
+                    TextRow("", text, "", false, false) { text = it; st.err = null }
                     TonalPill(Ico.CLIP, stringResource(R.string.paste)) { text = Util.paste(ctx) }
                 } else {
-                    T(stringResource(R.string.name), "name")
-                    T(stringResource(R.string.manual_address), "host")
-                    TextRow(stringResource(R.string.manual_port), v("port")) { f["port"] = it.filter { c -> c.isDigit() }.take(5); err = null }
+                    FText(st, stringResource(R.string.name), "name", "")
+                    FText(st, stringResource(R.string.manual_address), "host", "")
+                    TextRow(stringResource(R.string.manual_port), st.v("port", "")) { st.put("port", it.filter { c -> c.isDigit() }.take(5)) }
                     when (mode) {
                         "vless" -> {
-                            T("UUID", "uuid")
-                            Ch("Flow", "flow", listOf("none", "xtls-rprx-vision"))
-                            Transport(); Security(listOf("none", "tls", "reality"))
+                            FText(st, "UUID", "uuid", "")
+                            FChoice(st, "Flow", "flow", listOf("none", "xtls-rprx-vision"))
+                            TransportFields(st)
+                            SecurityFields(st, listOf("none", "tls", "reality"))
                         }
                         "vmess" -> {
-                            T("UUID", "uuid")
-                            Ch("Cipher", "cipher", listOf("auto", "aes-128-gcm", "chacha20-poly1305", "none", "zero"))
-                            T("Alter ID", "aid", "0")
-                            Transport(); Security(listOf("none", "tls"))
+                            FText(st, "UUID", "uuid", "")
+                            FChoice(st, "Cipher", "cipher", listOf("auto", "aes-128-gcm", "chacha20-poly1305", "none", "zero"))
+                            FText(st, "Alter ID", "aid", "0")
+                            TransportFields(st)
+                            SecurityFields(st, listOf("none", "tls"))
                         }
                         "trojan" -> {
-                            Pw(stringResource(R.string.manual_pass), "password")
-                            Transport(); Security(listOf("tls", "none", "reality"))
+                            FText(st, pass, "password", "")
+                            TransportFields(st)
+                            SecurityFields(st, listOf("tls", "none", "reality"))
                         }
                         "ss" -> {
-                            Ch("Method", "method", SS_METHODS)
-                            Pw(stringResource(R.string.manual_pass), "password")
-                            Ch("Plugin", "plugin", listOf("none", "obfs-local", "v2ray-plugin"))
-                            if (v("plugin", "none") != "none") T("Plugin options", "popts", "obfs=http;obfs-host=example.com")
+                            FChoice(st, "Method", "method", SS_METHODS)
+                            FText(st, pass, "password", "")
+                            FChoice(st, "Plugin", "plugin", listOf("none", "obfs-local", "v2ray-plugin"))
+                            if (st.v("plugin", "none") != "none") FText(st, "Plugin options", "popts", "obfs=http;obfs-host=example.com")
                         }
                         "hy2" -> {
-                            Pw(stringResource(R.string.manual_pass), "password")
-                            T("SNI", "sni"); T("ALPN", "alpn", "h3"); Sw("Allow insecure", "insecure")
-                            T("Obfs password (salamander)", "obfspw")
-                            T("Port hopping", "mport", "5000-6000")
-                            T("Up Mbps", "up"); T("Down Mbps", "down")
+                            FText(st, pass, "password", "")
+                            FText(st, "SNI", "sni", "")
+                            FText(st, "ALPN", "alpn", "h3")
+                            FSwitch(st, "Allow insecure", "insecure")
+                            FText(st, "Obfs password (salamander)", "obfspw", "")
+                            FText(st, "Port hopping", "mport", "5000-6000")
+                            FText(st, "Up Mbps", "up", "")
+                            FText(st, "Down Mbps", "down", "")
                         }
                         "hy1" -> {
-                            T("Auth", "auth")
-                            T("SNI", "sni"); T("ALPN", "alpn", "h3"); Sw("Allow insecure", "insecure")
-                            T("Obfs", "obfspw")
-                            T("Up Mbps", "up", "100"); T("Down Mbps", "down", "100")
+                            FText(st, "Auth", "auth", "")
+                            FText(st, "SNI", "sni", "")
+                            FText(st, "ALPN", "alpn", "h3")
+                            FSwitch(st, "Allow insecure", "insecure")
+                            FText(st, "Obfs", "obfspw", "")
+                            FText(st, "Up Mbps", "up", "100")
+                            FText(st, "Down Mbps", "down", "100")
                         }
                         "tuic" -> {
-                            T("UUID", "uuid")
-                            Pw(stringResource(R.string.manual_pass), "password")
-                            Ch("Congestion control", "cc", listOf("bbr", "cubic", "new_reno"))
-                            Ch("UDP relay mode", "udprelay", listOf("default", "native", "quic"))
-                            T("SNI", "sni"); T("ALPN", "alpn", "h3"); Sw("Allow insecure", "insecure")
+                            FText(st, "UUID", "uuid", "")
+                            FText(st, pass, "password", "")
+                            FChoice(st, "Congestion control", "cc", listOf("bbr", "cubic", "new_reno"))
+                            FChoice(st, "UDP relay mode", "udprelay", listOf("default", "native", "quic"))
+                            FText(st, "SNI", "sni", "")
+                            FText(st, "ALPN", "alpn", "h3")
+                            FSwitch(st, "Allow insecure", "insecure")
                         }
                         "wg" -> {
-                            T("Private key", "privkey")
-                            T("Peer public key", "pubkey")
-                            T("Pre-shared key", "psk")
-                            T("Local address", "wgaddr", "172.16.0.2/32")
-                            T("Reserved", "reserved", "1,2,3")
-                            T("MTU", "mtu", "1280")
+                            FText(st, "Private key", "privkey", "")
+                            FText(st, "Peer public key", "pubkey", "")
+                            FText(st, "Pre-shared key", "psk", "")
+                            FText(st, "Local address", "wgaddr", "172.16.0.2/32")
+                            FText(st, "Reserved", "reserved", "1,2,3")
+                            FText(st, "MTU", "mtu", "1280")
                         }
-                        "socks", "http" -> {
-                            T(stringResource(R.string.manual_user), "user")
-                            Pw(stringResource(R.string.manual_pass), "pass")
-                            if (mode == "http") Sw(stringResource(R.string.manual_tls), "tls")
+                        "socks" -> {
+                            FText(st, user, "user", "")
+                            FText(st, pass, "pass", "")
+                        }
+                        "http" -> {
+                            FText(st, user, "user", "")
+                            FText(st, pass, "pass", "")
+                            FSwitch(st, stringResource(R.string.manual_tls), "tls")
                         }
                     }
                 }
-                err?.let { Hint(it, error = true) }
+                val e = st.err
+                if (e != null) Hint(e, true)
             }
         },
         confirmButton = {
-            TextButton({
-                if (mode == "text") { onOk(text); return@TextButton }
-                try {
-                    val link = ManualBuilder.build(mode, f)
-                    try { Links.parse(link) } catch (e: LinkError) { err = e.message; return@TextButton }
-                    onOk(link)
-                } catch (_: IllegalArgumentException) {
-                    err = missing
+            TextButton(onClick = {
+                if (mode == "text") {
+                    onOk(text)
+                } else {
+                    val built: String? = try {
+                        ManualBuilder.build(mode, st.f)
+                    } catch (e: IllegalArgumentException) {
+                        st.err = missing
+                        null
+                    }
+                    if (built != null) {
+                        val bad: String? = try {
+                            Links.parse(built)
+                            null
+                        } catch (e: LinkError) {
+                            e.message ?: missing
+                        }
+                        if (bad != null) st.err = bad else onOk(built)
+                    }
                 }
             }) { Text(stringResource(R.string.ok)) }
         },
-        dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
