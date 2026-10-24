@@ -60,15 +60,6 @@ apps -> VpnService (TUN) -> sing-box -> [chain] -> your V2Ray config -> server
 other apps / PCs -> 127.0.0.1:10808 (mixed SOCKS5 + HTTP) -> same core
 ```
 
-## Build with GitHub Actions
-
-1. Upload this project to your repository (`Mrmmd2004/8ray_Android`).
-2. Open **Actions → Build APKs → Run workflow** (or push to `main`, or push a tag like `v1.0` to also create a release).
-3. Download the `8ray-apks` artifact: `8ray-armeabi-v7a.apk`, `8ray-arm64-v8a.apk`, `8ray-universal.apk`.
-
-The first build compiles sing-box (libbox) and takes a few minutes. `SINGBOX_REF` (default `v1.13.21`) picks the sing-box version.
-
-**Signing (optional).** Without secrets the APKs are signed with a debug key. For a stable key add the repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
 
 ## Notes
 
@@ -119,12 +110,4 @@ The first build compiles sing-box (libbox) and takes a few minutes. `SINGBOX_REF
 **برنامه**
 - تیره / روشن / رنگ پویا، فارسی (راست‌به‌چپ) و انگلیسی، کاشی تنظیمات سریع، اجرا هنگام بوت، نوتیفیکیشن با سرعت زنده، لاگ.
 
-## ساخت با GitHub Actions
 
-۱. همه‌ی فایل‌ها را در مخزن (`Mrmmd2004/8ray_Android`) آپلود کنید.
-۲. **Actions ← Build APKs ← Run workflow**.
-۳. فایل‌های `8ray-armeabi-v7a.apk` و `8ray-arm64-v8a.apk` و `8ray-universal.apk` را از `8ray-apks` دانلود کنید.
-
-بیلد اول چند دقیقه طول می‌کشد چون sing-box (libbox) کامپایل می‌شود.
-
-</div>
