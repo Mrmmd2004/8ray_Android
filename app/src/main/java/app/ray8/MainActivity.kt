@@ -175,7 +175,10 @@ private fun Root(onLanguageChanged: () -> Unit) {
                     ) { sc ->
                         when (sc) {
                             HOME -> HomeScreen(openConfigs = { go(CONFIGS) }, openLogs = { go(LOGS) }, openRouting = { go(ROUTING) })
-                            CONFIGS -> ConfigsScreen(openSubs = { go(SUBS) })
+                            CONFIGS -> ConfigsScreen(
+                                openSubs = { go(SUBS) }, openRouting = { go(ROUTING) }, openLogs = { go(LOGS) },
+                                openAbout = { go(ABOUT) }, onLanguageChanged = onLanguageChanged,
+                            )
                             SETTINGS -> SettingsScreen(
                                 openLogs = { go(LOGS) }, openAbout = { go(ABOUT) }, openSplit = { go(SPLIT) },
                                 openRouting = { go(ROUTING) }, openSubs = { go(SUBS) }, onLanguageChanged = onLanguageChanged,

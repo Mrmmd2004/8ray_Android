@@ -46,6 +46,7 @@ fun SubsScreen(back: () -> Unit) {
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Sub?>(null) }
     var deleting by remember { mutableStateOf<Sub?>(null) }
+    var qrFor by remember { mutableStateOf<Sub?>(null) }
 
     fun update(id: String?) {
         if (busy) return
@@ -103,6 +104,11 @@ fun SubsScreen(back: () -> Unit) {
                             TonalPill(Ico.EDIT, stringResource(R.string.edit)) { editing = sb }
                             TonalPill(Ico.TRASH, stringResource(R.string.delete), danger = true) { deleting = sb }
                         }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TonalPill(Ico.QR, "QR") { qrFor = sb }
+                            TonalPill(Ico.SHARE, stringResource(R.string.share)) { Util.share(ctx, sb.url) }
+                            TonalPill(Ico.COPY, stringResource(R.string.copy)) { Util.copy(ctx, "url", sb.url) }
+                        }
                     }
                 }
             }
@@ -118,6 +124,7 @@ fun SubsScreen(back: () -> Unit) {
             busy = false
         }
     }
+    qrFor?.let { sb -> QrDialog(sb.name, sb.url) { qrFor = null } }
     editing?.let { sb ->
         var name by remember(sb.id) { mutableStateOf(sb.name) }
         var url by remember(sb.id) { mutableStateOf(sb.url) }

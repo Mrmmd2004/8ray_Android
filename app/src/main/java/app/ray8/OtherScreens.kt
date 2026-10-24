@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -159,7 +160,15 @@ private fun LinkRow(ico: Ico, title: String, sub: String, onClick: () -> Unit) {
     }
 }
 
-private data class AppItem(val label: String, val pkg: String)
+private data class AppItem(val label: String, val pkg: String, val icon: androidx.compose.ui.graphics.ImageBitmap?)
+
+private fun android.graphics.drawable.Drawable.toBitmapSafe(px: Int): android.graphics.Bitmap {
+    val bmp = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+    val cv = android.graphics.Canvas(bmp)
+    setBounds(0, 0, px, px)
+    draw(cv)
+    return bmp
+}
 
 @Composable
 fun SplitScreen(back: () -> Unit) {
@@ -174,7 +183,7 @@ fun SplitScreen(back: () -> Unit) {
             val pm = ctx.packageManager
             val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             pm.queryIntentActivities(i, 0)
-                .map { AppItem(it.loadLabel(pm).toString(), it.activityInfo.packageName) }
+                .map { AppItem(it.loadLabel(pm).toString(), it.activityInfo.packageName, runCatching { it.loadIcon(pm).toBitmapSafe(96).asImageBitmap() }.getOrNull()) }
                 .filter { it.pkg != ctx.packageName }
                 .distinctBy { it.pkg }
                 .sortedBy { it.label.lowercase() }
@@ -205,8 +214,12 @@ fun SplitScreen(back: () -> Unit) {
                         }.padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(Modifier.size(38.dp).clip(CircleShape).background(c.primary.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                        Text(a.label.take(1).uppercase(), color = c.primary, fontWeight = FontWeight.Bold)
+                    if (a.icon != null) {
+                        androidx.compose.foundation.Image(a.icon, null, Modifier.size(40.dp))
+                    } else {
+                        Box(Modifier.size(40.dp).clip(CircleShape).background(c.primary.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                            Text(a.label.take(1).uppercase(), color = c.primary, fontWeight = FontWeight.Bold)
+                        }
                     }
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text(a.label, maxLines = 1, style = MaterialTheme.typography.bodyMedium)

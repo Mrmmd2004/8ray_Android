@@ -42,25 +42,6 @@ fun SettingsScreen(
     var totalsTick by remember { mutableStateOf(0) }
     fun up(f: (Settings) -> Settings) = SettingsStore.update(f)
 
-    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
-        if (uri != null) {
-            runCatching {
-                ctx.contentResolver.openOutputStream(uri)?.use { it.write(NodeStore.exportJson(true).toString(2).toByteArray()) }
-            }.onSuccess { Util.toast(ctx, ctx.getString(R.string.backup_saved)) }
-                .onFailure { Util.toast(ctx, ctx.getString(R.string.backup_bad)) }
-        }
-    }
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) {
-            val n = runCatching {
-                val text = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
-                NodeStore.importJson(JSONObject(text), false)
-            }.getOrNull()
-            Util.toast(ctx, if (n != null) ctx.getString(R.string.backup_restored, n) else ctx.getString(R.string.backup_bad))
-            if (n != null) onLanguageChanged()
-        }
-    }
-
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
@@ -143,15 +124,6 @@ fun SettingsScreen(
             TextRow(stringResource(R.string.test_url), s.testUrl, DEFAULT_TEST_URL) { v -> up { it.copy(testUrl = v) } }
             NumberRow(stringResource(R.string.test_timeout), s.testTimeoutMs) { v -> up { it.copy(testTimeoutMs = v) } }
             NumberRow(stringResource(R.string.test_workers), s.testWorkers) { v -> up { it.copy(testWorkers = v) } }
-        }
-
-        Group(stringResource(R.string.sec_more)) {
-            ActionRow(Ico.GLOBE, stringResource(R.string.routing)) { openRouting() }
-            ActionRow(Ico.LIST, stringResource(R.string.subscriptions)) { openSubs() }
-            ActionRow(Ico.SEND, stringResource(R.string.backup_save)) { exporter.launch("8ray-backup.json") }
-            ActionRow(Ico.DOWN, stringResource(R.string.backup_restore)) { importer.launch("*/*") }
-            ActionRow(Ico.LOGS, stringResource(R.string.open_logs)) { openLogs() }
-            ActionRow(Ico.INFO, stringResource(R.string.about)) { openAbout() }
         }
 
         Group(stringResource(R.string.sec_traffic)) {

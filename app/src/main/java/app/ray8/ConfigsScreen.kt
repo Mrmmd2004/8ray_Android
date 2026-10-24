@@ -69,7 +69,7 @@ private fun readUri(ctx: Context, uri: android.net.Uri): String =
     ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
 
 @Composable
-fun ConfigsScreen(openSubs: () -> Unit) {
+fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () -> Unit, openAbout: () -> Unit, onLanguageChanged: () -> Unit) {
     val ctx = LocalContext.current
     val c = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
@@ -85,6 +85,7 @@ fun ConfigsScreen(openSubs: () -> Unit) {
     var filter by remember { mutableStateOf("all") }
     var addMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     var manual by remember { mutableStateOf(false) }
     var confirmAll by remember { mutableStateOf(false) }
     var qrFor by remember { mutableStateOf<Node?>(null) }
@@ -108,7 +109,16 @@ fun ConfigsScreen(openSubs: () -> Unit) {
             if (text.contains("8ray-backup")) {
                 val n = runCatching { NodeStore.importJson(JSONObject(text), false) }.getOrNull()
                 Util.toast(ctx, if (n != null) ctx.getString(R.string.backup_restored, n) else ctx.getString(R.string.backup_bad))
+                if (n != null) onLanguageChanged()
             } else importText(text)
+        }
+    }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            runCatching {
+                ctx.contentResolver.openOutputStream(uri)?.use { it.write(NodeStore.exportJson(true).toString(2).toByteArray()) }
+            }.onSuccess { Util.toast(ctx, ctx.getString(R.string.backup_saved)) }
+                .onFailure { Util.toast(ctx, ctx.getString(R.string.backup_bad)) }
         }
     }
 
@@ -134,7 +144,7 @@ fun ConfigsScreen(openSubs: () -> Unit) {
             Text(stringResource(R.string.configs), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconBtn(Ico.SCAN, {
-                    scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(false).setPrompt(""))
+                    scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setCaptureActivity(PortraitCaptureActivity::class.java).setOrientationLocked(false).setPrompt(""))
                 })
                 IconBtn(Ico.BOLT, {
                     if (busy) Tester.cancel() else Tester.testReal(ctx, shown.map { it.id })
@@ -149,6 +159,17 @@ fun ConfigsScreen(openSubs: () -> Unit) {
                         DropdownMenuItem(text = { Text(stringResource(R.string.add_file)) }, onClick = { addMenu = false; picker.launch("*/*") })
                         DropdownMenuItem(text = { Text(stringResource(R.string.add_manual)) }, onClick = { addMenu = false; manual = true })
                         DropdownMenuItem(text = { Text(stringResource(R.string.subscriptions)) }, onClick = { addMenu = false; openSubs() })
+                    }
+                }
+                Box {
+                    IconBtn(Ico.MENU, { menuOpen = true })
+                    DropdownMenu(menuOpen, { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.routing)) }, onClick = { menuOpen = false; openRouting() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.subscriptions)) }, onClick = { menuOpen = false; openSubs() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.backup_save)) }, onClick = { menuOpen = false; exporter.launch("8ray-backup.json") })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.backup_restore)) }, onClick = { menuOpen = false; picker.launch("*/*") })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.open_logs)) }, onClick = { menuOpen = false; openLogs() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.about)) }, onClick = { menuOpen = false; openAbout() })
                     }
                 }
                 Box {
@@ -205,7 +226,7 @@ fun ConfigsScreen(openSubs: () -> Unit) {
                     Text(stringResource(R.string.empty_configs), color = c.onSurfaceVariant, textAlign = TextAlign.Center)
                     TonalPill(Ico.CLIP, stringResource(R.string.add_clipboard)) { importText(Util.paste(ctx)) }
                     TonalPill(Ico.SCAN, stringResource(R.string.scan_qr)) {
-                        scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setOrientationLocked(false).setPrompt(""))
+                        scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setCaptureActivity(PortraitCaptureActivity::class.java).setOrientationLocked(false).setPrompt(""))
                     }
                     TonalPill(Ico.LIST, stringResource(R.string.add_subscription)) { openSubs() }
                 }
@@ -228,7 +249,7 @@ fun ConfigsScreen(openSubs: () -> Unit) {
         manual = false
         importText(it)
     }
-    qrFor?.let { QrDialog(it) { qrFor = null } }
+    qrFor?.let { QrDialog(it.name, it.link) { qrFor = null } }
     editFor?.let { EditDialog(it) { editFor = null } }
     jsonFor?.let { n ->
         val text = remember(n.id) { runCatching { Links.parse(n.link).json.toString(2) }.getOrDefault("") }
@@ -300,6 +321,7 @@ private fun NodeRow(n: Node, selected: Boolean, onSelect: () -> Unit, onTest: ()
             DropdownMenu(menu, { menu = false }) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.test_one)) }, onClick = { menu = false; onTest() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.copy_link)) }, onClick = { menu = false; Util.copy(ctx, "link", n.link) })
+                DropdownMenuItem(text = { Text(stringResource(R.string.share_link)) }, onClick = { menu = false; Util.share(ctx, n.link) })
                 DropdownMenuItem(text = { Text(stringResource(R.string.show_qr)) }, onClick = { menu = false; onQr() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.edit)) }, onClick = { menu = false; onEdit() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.show_json)) }, onClick = { menu = false; onJson() })
@@ -336,18 +358,25 @@ fun TextDialog(title: String, hint: String, initial: String, onDismiss: () -> Un
 }
 
 @Composable
-fun QrDialog(n: Node, onDismiss: () -> Unit) {
-    val bmp = remember(n.id) { Util.qr(n.link) }
+fun QrDialog(title: String, text: String, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val bmp = remember(text) { Util.qr(text) }
     AlertDialog(
         onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        title = { Text(n.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         text = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (bmp != null) Image(bmp.asImageBitmap(), null, Modifier.size(260.dp).clip(RoundedCornerShape(12.dp)))
                 else Text(stringResource(R.string.qr_too_long))
             }
         },
-        confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.close)) } },
+        confirmButton = {
+            Row {
+                TextButton({ Util.copy(ctx, "link", text) }) { Text(stringResource(R.string.copy)) }
+                TextButton({ Util.share(ctx, text) }) { Text(stringResource(R.string.share)) }
+                TextButton(onDismiss) { Text(stringResource(R.string.close)) }
+            }
+        },
     )
 }
 

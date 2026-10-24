@@ -80,6 +80,8 @@
     <string name="delete_all">حذف همه‌ی کانفیگ‌ها</string>
     <string name="delete_all_warn">همه‌ی کانفیگ‌ها حذف می‌شوند. ساب‌ها می‌مانند.</string>
     <string name="testing_progress">تست %1$d از %2$d</string>
+    <string name="share">اشتراک‌گذاری</string>
+    <string name="share_link">اشتراک‌گذاری لینک</string>
     <string name="copy_link">کپی لینک</string>
     <string name="show_qr">نمایش QR</string>
     <string name="show_json">نمایش JSON sing-box</string>

@@ -63,7 +63,7 @@ import androidx.compose.ui.unit.sp
 
 enum class Ico {
     BACK, SETTINGS, LOGS, POWER, CHECK, CHEVRON, LOCK, DOWN, UP, BOLT, GLOBE, REFRESH,
-    COPY, SHARE, TRASH, INFO, CODE, SEND, PLUS, QR, EDIT, STAR, HOME, LIST, MORE, SCAN, CLIP
+    COPY, SHARE, TRASH, INFO, CODE, SEND, PLUS, QR, EDIT, STAR, HOME, LIST, MORE, SCAN, CLIP, MENU
 }
 
 @Composable
@@ -165,6 +165,7 @@ fun Icon8(ico: Ico, tint: Color, sz: Dp = 22.dp, modifier: Modifier = Modifier, 
                 drawRoundRect(tint, topLeft = p(8.5f, 2.5f), size = Size(7f * u, 5f * u), cornerRadius = CornerRadius(1.5f * u), style = st)
                 line(9f, 13f, 15f, 13f); line(9f, 17f, 13f, 17f)
             }
+            Ico.MENU -> { line(4f, 7f, 20f, 7f); line(4f, 12f, 20f, 12f); line(4f, 17f, 20f, 17f) }
             Ico.SEND -> { poly(true, 21f, 3f, 3f, 10.5f, 10f, 13f, 13f, 20f); line(10f, 13f, 21f, 3f) }
         }
     }

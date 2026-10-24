@@ -94,7 +94,6 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
     val conns by Engine.connections.collectAsStateWithLifecycle()
     val exit by Engine.exitInfo.collectAsStateWithLifecycle()
     val speed by Engine.speedBps.collectAsStateWithLifecycle()
-    val logs by Engine.logs.collectAsStateWithLifecycle()
     val nodes by NodeStore.nodes.collectAsStateWithLifecycle()
     val activeId by NodeStore.active.collectAsStateWithLifecycle()
     val reason by Engine.lastReason.collectAsStateWithLifecycle()
@@ -230,7 +229,12 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
         }
 
         Spacer(Modifier.height(8.dp))
-        ConnectButton(st.phase, ::toggle, 158.dp)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ConnectButton(st.phase, ::toggle, 158.dp)
+            if (live) {
+                Box(Modifier.align(Alignment.CenterEnd)) { IconBtn(Ico.REFRESH, { TunnelService.restart(ctx) }) }
+            }
+        }
         Spacer(Modifier.height(4.dp))
         Row(
             Modifier.clip(RoundedCornerShape(50)).background(statusColor.copy(alpha = 0.12f)).padding(horizontal = 14.dp, vertical = 6.dp),
@@ -314,7 +318,6 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TonalPill(Ico.BOLT, if (testing) stringResource(R.string.ping_testing) else stringResource(R.string.ping_test), enabled = !testing) { runPing() }
                 TonalPill(Ico.DOWN, if (speedTesting) stringResource(R.string.ping_testing) else stringResource(R.string.speed_test), enabled = !speedTesting) { runSpeed() }
-                TonalPill(Ico.REFRESH, stringResource(R.string.reconnect)) { TunnelService.restart(ctx) }
             }
             testResult?.let { Text(it, Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant) }
         }
@@ -329,28 +332,9 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
                 ) { v -> if (s.vpnMode != v) SettingsStore.update { it.copy(vpnMode = v) } }
                 if (!idle) Hint(stringResource(R.string.locked_hint))
                 SwitchRow(stringResource(R.string.auto_select_fastest), s.autoSelect) { TunnelService.setAuto(ctx, it) }
-                Label(stringResource(R.string.bypass_for))
-                Chips(
-                    listOf("none" to stringResource(R.string.geo_none), "ir" to stringResource(R.string.geo_ir), "cn" to stringResource(R.string.geo_cn), "ru" to stringResource(R.string.geo_ru)),
-                    s.bypassGeo
-                ) { v ->
-                    SettingsStore.update { it.copy(bypassGeo = v) }
-                    if (v != "none") openRouting()
-                    else if (live) TunnelService.restart(ctx)
-                }
             }
         }
 
-        if (logs.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            AppCard(Modifier.clip(RoundedCornerShape(22.dp)).clickable(onClick = openLogs)) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                    logs.takeLast(2).forEach {
-                        Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = c.onSurfaceVariant)
-                    }
-                }
-            }
-        }
         Spacer(Modifier.height(24.dp))
     }
 }
