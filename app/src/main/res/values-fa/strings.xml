@@ -143,6 +143,8 @@
     <string name="direct_dns_hint">خالی = DNS خود وای‌فای / اپراتور</string>
     <string name="dns_note">سایت‌های مستقیم با DNS اول و سایت‌های پروکسی با DNS دوم resolve می‌شوند تا نشتی نباشد.</string>
     <string name="restart_note">تغییرات در اتصال بعدی اعمال می‌شود.</string>
+    <string name="sec_main">مهم‌ترین‌ها</string>
+    <string name="sec_connection">اتصال</string>
     <string name="sec_general">عمومی</string>
     <string name="language">زبان</string>
     <string name="theme">تم</string>

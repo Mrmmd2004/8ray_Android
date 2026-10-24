@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-private fun readUri(ctx: Context, uri: android.net.Uri): String =
+internal fun readUri(ctx: Context, uri: android.net.Uri): String =
     ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
 
 @Composable

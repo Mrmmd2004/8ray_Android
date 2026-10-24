@@ -216,6 +216,7 @@ class TunnelService : VpnService() {
                     Engine.status.value = Status(Phase.CONNECTED)
                     Engine.log("Connected: ${activeName()}")
                     scope.launch { fetchExit() }
+                    if (SettingsStore.current.autoSelect) scope.launch { kickAuto() }
                     val why = monitor()
                     Engine.pingMs.value = null
                     Engine.exitInfo.value = null
@@ -339,9 +340,10 @@ class TunnelService : VpnService() {
                 fails++
                 Engine.pingMs.value = null
                 Engine.log("Ping failed ($fails/$limit), last data ${(now - lastRxAt) / 1000} s ago")
+                if (s.autoSelect) kickAuto()
                 if (fails >= limit) {
                     val cur = NodeStore.active.value
-                    if (cur.isNotEmpty()) {
+                    if (cur.isNotEmpty() && !s.autoSelect) {
                         tried.add(cur)
                         NodeStore.setDelays(mapOf(cur to -1))
                     }
@@ -368,6 +370,14 @@ class TunnelService : VpnService() {
             }
         }
         return Exit.DEAD
+    }
+
+    /** Auto mode: tests every config of the group now, so the best working one is used at once. */
+    private suspend fun kickAuto() {
+        val s = SettingsStore.current
+        val api = Engine.api ?: return
+        val ok = withContext(Dispatchers.IO) { api.groupTest(ConfigBuilder.AUTO, s.testUrlOrDefault(), s.timeoutMs()) }
+        Engine.log(if (ok) "Auto: tested the group, the best config is in use" else "Auto: no config of the group answered")
     }
 
     /** Best config that has not been tried yet in this round: lowest known delay first, untested next. */

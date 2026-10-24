@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,6 +29,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 @Composable
@@ -40,7 +44,27 @@ fun SettingsScreen(
     val st by Engine.status.collectAsStateWithLifecycle()
     val idle = st.phase == Phase.IDLE
     var totalsTick by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
     fun up(f: (Settings) -> Settings) = SettingsStore.update(f)
+
+    val restorePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            val text = withContext(Dispatchers.IO) { runCatching { readUri(ctx, uri) }.getOrDefault("") }
+            val n = if (text.contains("8ray-backup")) runCatching { NodeStore.importJson(JSONObject(text), false) }.getOrNull() else null
+            Util.toast(ctx, if (n != null) ctx.getString(R.string.backup_restored, n) else ctx.getString(R.string.backup_bad))
+            if (n != null) onLanguageChanged()
+        }
+    }
+    val backupSaver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            runCatching {
+                ctx.contentResolver.openOutputStream(uri)?.use { it.write(NodeStore.exportJson(true).toString(2).toByteArray()) }
+            }.onSuccess { Util.toast(ctx, ctx.getString(R.string.backup_saved)) }
+                .onFailure { Util.toast(ctx, ctx.getString(R.string.backup_bad)) }
+        }
+    }
+    val splitLabel = stringResource(R.string.split_tunnel) +
+        if (s.splitMode != "off" && s.splitApps.isNotEmpty()) "  ·  " + stringResource(R.string.split_summary, s.splitApps.size) else ""
 
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -49,6 +73,22 @@ fun SettingsScreen(
             stringResource(R.string.settings), Modifier.padding(top = 8.dp, bottom = 4.dp),
             style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
         )
+
+        Group(stringResource(R.string.sec_main)) {
+            ActionRow(Ico.REFRESH, stringResource(R.string.subscriptions)) { openSubs() }
+            ActionRow(Ico.LIST, splitLabel) { openSplit() }
+            ActionRow(Ico.GLOBE, stringResource(R.string.routing)) { openRouting() }
+        }
+
+        Group(stringResource(R.string.sec_connection)) {
+            Chips(
+                listOf(true to stringResource(R.string.mode_vpn), false to stringResource(R.string.mode_proxy)),
+                s.vpnMode, enabled = idle
+            ) { v -> if (s.vpnMode != v) up { it.copy(vpnMode = v) } }
+            if (!idle) Hint(stringResource(R.string.locked_hint))
+            SwitchRow(stringResource(R.string.auto_select_fastest), s.autoSelect) { v -> TunnelService.setAuto(ctx, v) }
+            SwitchRow(stringResource(R.string.auto_switch), s.autoSwitch) { v -> up { it.copy(autoSwitch = v) } }
+        }
 
         Group(stringResource(R.string.sec_general)) {
             Field(stringResource(R.string.language)) {
@@ -95,7 +135,8 @@ fun SettingsScreen(
                 Chips(listOf("gvisor" to "gVisor", "mixed" to "Mixed", "system" to "System"), s.tunStack) { v -> up { it.copy(tunStack = v) } }
             }
             NumberRow(stringResource(R.string.tun_mtu), s.tunMtu) { v -> up { it.copy(tunMtu = v) } }
-            ActionRow(Ico.LIST, stringResource(R.string.split_tunnel)) { openSplit() }
+            SwitchRow(stringResource(R.string.block_quic), s.blockQuic) { v -> up { it.copy(blockQuic = v) } }
+            SwitchRow(stringResource(R.string.sniffing), s.sniffing) { v -> up { it.copy(sniffing = v) } }
         }
 
         Group(stringResource(R.string.sec_core)) {
@@ -117,7 +158,6 @@ fun SettingsScreen(
         }
 
         Group(stringResource(R.string.sec_health)) {
-            SwitchRow(stringResource(R.string.auto_switch), s.autoSwitch) { v -> up { it.copy(autoSwitch = v) } }
             NumberRow(stringResource(R.string.auto_count), s.autoCount) { v -> up { it.copy(autoCount = v) } }
             NumberRow(stringResource(R.string.ping_fails), s.pingFails) { v -> up { it.copy(pingFails = v) } }
             NumberRow(stringResource(R.string.ping_interval), s.pingIntervalSec) { v -> up { it.copy(pingIntervalSec = v) } }
@@ -132,7 +172,17 @@ fun SettingsScreen(
             Text(stringResource(R.string.totals_fmt, fmtBytes(rx), fmtBytes(tx)))
             ActionRow(Ico.TRASH, stringResource(R.string.reset_totals), danger = true) { Totals.reset(ctx); totalsTick++ }
         }
+        Group(stringResource(R.string.sec_more)) {
+            ActionRow(Ico.DOWN, stringResource(R.string.backup_save)) { backupSaver.launch("8ray-backup.json") }
+            ActionRow(Ico.UP, stringResource(R.string.backup_restore)) { restorePicker.launch("*/*") }
+            ActionRow(Ico.LOGS, stringResource(R.string.open_logs)) { openLogs() }
+        }
+
         if (!idle) Hint(stringResource(R.string.restart_note))
+
+        Group(stringResource(R.string.about)) {
+            ActionRow(Ico.INFO, stringResource(R.string.app_name) + "  ·  v" + BuildConfig.VERSION_NAME) { openAbout() }
+        }
         Spacer(Modifier.height(28.dp))
     }
 }

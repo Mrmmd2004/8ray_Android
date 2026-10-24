@@ -46,6 +46,18 @@ class ClashApi(private val port: Int, private val secret: String) {
         null
     }
 
+    /**
+     * Runs the url test of a group (the auto / urltest group) over all its members right now, so the group
+     * switches to the best working one at once. True when at least one member answered.
+     */
+    fun groupTest(group: String, url: String, timeoutMs: Int): Boolean = try {
+        val q = "?url=" + URLEncoder.encode(url, "UTF-8") + "&timeout=$timeoutMs"
+        val (code, text) = call("/group/${URLEncoder.encode(group, "UTF-8")}/delay$q", timeoutMs = timeoutMs * 2 + 6000)
+        code == 200 && JSONObject(text).let { o -> o.keys().asSequence().any { k -> o.optInt(k, 0) > 0 } }
+    } catch (_: Exception) {
+        false
+    }
+
     fun select(group: String, tag: String): Boolean = try {
         call("/proxies/$group", "PUT", JSONObject().put("name", tag).toString()).first in 200..299
     } catch (_: Exception) {

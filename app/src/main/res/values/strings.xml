@@ -143,6 +143,8 @@
     <string name="direct_dns_hint">empty = DNS of your Wi-Fi / mobile network</string>
     <string name="dns_note">Direct sites resolve with the first server and proxied sites with the second, so names never leak between the two paths.</string>
     <string name="restart_note">Changes apply on the next connection.</string>
+    <string name="sec_main">Essentials</string>
+    <string name="sec_connection">Connection</string>
     <string name="sec_general">General</string>
     <string name="language">Language</string>
     <string name="theme">Theme</string>

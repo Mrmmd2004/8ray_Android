@@ -130,6 +130,13 @@ object Links {
 
     private val HOST_SPLIT = Regex("[,\\s]+")
 
+    /**
+     * Xray (v2rayNG) sends a Chrome User-Agent on WebSocket / HTTPUpgrade requests; sing-box sends
+     * "Go-http-client" unless a header is given. Some servers and fronts drop the latter, so the same
+     * browser-like value is used here when the link does not set its own.
+     */
+    private const val BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
     private fun transport(netIn: String?, hostIn: String?, path: String, service: String, headerType: String): JSONObject? {
         val net = (netIn ?: "tcp").trim().lowercase()
         val host = (hostIn ?: "").trim()
@@ -140,7 +147,7 @@ object Links {
             "ws", "websocket" -> {
                 val (p, ed) = cleanPath(path)
                 val t = obj("type" to "ws", "path" to p)
-                if (host.isNotEmpty()) t.put("headers", obj("Host" to host))
+                t.put("headers", obj("User-Agent" to BROWSER_UA).also { if (host.isNotEmpty()) it.put("Host", host) })
                 if (ed > 0) {
                     t.put("max_early_data", ed)
                     t.put("early_data_header_name", "Sec-WebSocket-Protocol")
@@ -149,7 +156,7 @@ object Links {
             }
             "grpc" -> obj("type" to "grpc", "service_name" to service.ifEmpty { path.trimStart('/') })
             "h2", "http" -> obj("type" to "http", "host" to arr(splitList(host, HOST_SPLIT)), "path" to path.ifEmpty { "/" })
-            "httpupgrade" -> obj("type" to "httpupgrade", "host" to host, "path" to path.ifEmpty { "/" })
+            "httpupgrade" -> obj("type" to "httpupgrade", "host" to host, "path" to path.ifEmpty { "/" }, "headers" to obj("User-Agent" to BROWSER_UA))
             "xhttp", "splithttp" -> throw LinkError("xhttp is not supported by sing-box")
             "kcp", "mkcp" -> throw LinkError("mKCP is not supported by sing-box")
             "quic" -> throw LinkError("the QUIC transport is not supported by sing-box")
@@ -189,6 +196,19 @@ object Links {
         return t
     }
 
+    /**
+     * WebSocket and HTTPUpgrade only speak HTTP/1.1. With "alpn=h2,http/1.1" the server picks h2 and the
+     * upgrade fails (Xray / v2rayNG force http/1.1 for these transports, so such links work there).
+     */
+    private fun fixAlpn(out: JSONObject, net: String) {
+        if (net.trim().lowercase() !in setOf("ws", "websocket", "httpupgrade")) return
+        val t = out.optJSONObject("tls") ?: return
+        val a = t.optJSONArray("alpn") ?: return
+        val keep = ArrayList<String>()
+        for (i in 0 until a.length()) a.optString(i).let { if (it.isNotEmpty() && it != "h2") keep.add(it) }
+        t.put("alpn", arr(if (keep.isEmpty()) listOf("http/1.1") else keep))
+    }
+
     /** Transport + TLS part shared by vless, new style vmess and trojan links. Returns (network, tls?). */
     private fun applyNetTls(out: JSONObject, q: Map<String, String>, defaultSecurity: String, fallbackHost: String): Pair<String, Boolean> {
         val net = q["type"] ?: q["net"] ?: "tcp"
@@ -201,6 +221,7 @@ object Links {
             q["pbk"] ?: "", q["sid"] ?: "",
         )
         if (t != null) out.put("tls", t)
+        fixAlpn(out, net)
         return net.lowercase() to (t != null)
     }
 
@@ -260,6 +281,7 @@ object Links {
         if (tr != null) out.put("transport", tr)
         val t = tls(s("tls"), s("sni").ifEmpty { s("peer") }, s("alpn"), s("fp"), truthy(s("allowInsecure").ifEmpty { s("allowinsecure") }), h)
         if (t != null) out.put("tls", t)
+        fixAlpn(out, net)
         return Res(s("ps"), out, net.lowercase(), t != null)
     }
 
