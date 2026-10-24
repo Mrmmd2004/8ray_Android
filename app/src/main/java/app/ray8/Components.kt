@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -296,7 +297,17 @@ fun Pill(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -
 }
 
 @Composable
-fun <T> Chips(options: List<Pair<T, String>>, selected: T, enabled: Boolean = true, onSelect: (T) -> Unit) {
+fun <T> Chips(options: List<Pair<T, String>>, selected: T, enabled: Boolean = true, scroll: Boolean = false, onSelect: (T) -> Unit) {
+    if (scroll) {
+        // One line that scrolls sideways (used for long lists such as subscriptions).
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { (v, label) -> Pill(label, v == selected, enabled) { onSelect(v) } }
+        }
+        return
+    }
     // Wraps onto the next line instead of running off the screen.
     FlowRow(
         Modifier.fillMaxWidth(),

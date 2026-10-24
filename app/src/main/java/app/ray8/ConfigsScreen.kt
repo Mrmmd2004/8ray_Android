@@ -214,7 +214,7 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
                 subs.forEach { sb -> add(sb.id to sb.name.take(18)) }
             }
             if (opts.size > 1) {
-                Chips(opts, filter) { filter = it }
+                Chips(opts, filter, scroll = true) { filter = it }
                 Spacer(Modifier.height(8.dp))
             }
         }
