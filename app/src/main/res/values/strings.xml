@@ -214,4 +214,11 @@
     <string name="telegram">Telegram channel</string>
     <string name="license_title">License and credits</string>
     <string name="license_text">8ray is free software released under the GNU AGPL-3.0.\n\nIt runs your V2Ray configs with sing-box (GPL-3.0 with a name-use clause) and uses ZXing for QR codes. Thank you to these projects.</string>
+    <string name="manual_address">Address (IP or domain)</string>
+    <string name="manual_port">Port</string>
+    <string name="manual_user">Username (optional)</string>
+    <string name="manual_pass">Password (optional)</string>
+    <string name="manual_tls">TLS (HTTPS proxy)</string>
+    <string name="manual_text">Link / JSON</string>
+    <string name="manual_missing">Address and port are required</string>
 </resources>

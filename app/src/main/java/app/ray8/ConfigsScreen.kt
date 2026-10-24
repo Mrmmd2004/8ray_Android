@@ -245,7 +245,7 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
         }
     }
 
-    if (manual) TextDialog(stringResource(R.string.add_manual), stringResource(R.string.add_manual_hint), "", { manual = false }) {
+    if (manual) ManualDialog({ manual = false }) {
         manual = false
         importText(it)
     }

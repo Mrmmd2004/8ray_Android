@@ -214,4 +214,11 @@
     <string name="telegram">کانال تلگرام</string>
     <string name="license_title">مجوز و منابع</string>
     <string name="license_text">8ray نرم‌افزار آزاد و تحت مجوز GNU AGPL-3.0 است.\n\nکانفیگ‌های V2Ray با sing-box اجرا می‌شوند و QR با ZXing ساخته و خوانده می‌شود. از این پروژه‌ها سپاسگزاریم.</string>
+    <string name="manual_address">آدرس (IP یا دامنه)</string>
+    <string name="manual_port">پورت</string>
+    <string name="manual_user">نام کاربری (اختیاری)</string>
+    <string name="manual_pass">رمز عبور (اختیاری)</string>
+    <string name="manual_tls">TLS (پروکسی HTTPS)</string>
+    <string name="manual_text">لینک / JSON</string>
+    <string name="manual_missing">آدرس و پورت لازم است</string>
 </resources>
