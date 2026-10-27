@@ -223,4 +223,7 @@
     <string name="manual_tls">TLS (پروکسی HTTPS)</string>
     <string name="manual_text">لینک / JSON</string>
     <string name="manual_missing">آدرس و پورت لازم است</string>
+    <string name="update_all_subs">به‌روزرسانی همه ساب‌ها</string>
+    <string name="copy_sub_link">کپی لینک ساب</string>
+    <string name="sub_none">ساب‌اسکریپشنی وجود ندارد</string>
 </resources>

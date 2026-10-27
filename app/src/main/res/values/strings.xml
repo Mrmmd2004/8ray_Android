@@ -223,4 +223,7 @@
     <string name="manual_tls">TLS (HTTPS proxy)</string>
     <string name="manual_text">Link / JSON</string>
     <string name="manual_missing">Address and port are required</string>
+    <string name="update_all_subs">Update all subscriptions</string>
+    <string name="copy_sub_link">Copy subscription link</string>
+    <string name="sub_none">No subscriptions</string>
 </resources>

@@ -92,6 +92,24 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
     var editFor by remember { mutableStateOf<Node?>(null) }
     var jsonFor by remember { mutableStateOf<Node?>(null) }
     var working by remember { mutableStateOf(false) }
+    var subMenu by remember { mutableStateOf<Sub?>(null) }
+    var subEdit by remember { mutableStateOf<Sub?>(null) }
+    var subDelete by remember { mutableStateOf<Sub?>(null) }
+
+    fun updateSubs(id: String?) {
+        if (working) return
+        scope.launch {
+            working = true
+            if (id == null) {
+                val n = Subs.updateAll(false, 1)
+                Util.toast(ctx, ctx.getString(R.string.subs_updated_n, n))
+            } else {
+                val r = Subs.update(id)
+                Util.toast(ctx, if (r.error == null) ctx.getString(R.string.sub_updated, NodeStore.sub(id)?.name ?: "", r.added) else ctx.getString(R.string.sub_failed, r.error))
+            }
+            working = false
+        }
+    }
 
     fun importText(text: String) {
         scope.launch {
@@ -164,6 +182,10 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
                 Box {
                     IconBtn(Ico.MENU, { menuOpen = true })
                     DropdownMenu(menuOpen, { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.update_all_subs)) }, onClick = {
+                            menuOpen = false
+                            if (subs.isEmpty()) Util.toast(ctx, ctx.getString(R.string.sub_none)) else updateSubs(null)
+                        })
                         DropdownMenuItem(text = { Text(stringResource(R.string.routing)) }, onClick = { menuOpen = false; openRouting() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.subscriptions)) }, onClick = { menuOpen = false; openSubs() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.backup_save)) }, onClick = { menuOpen = false; exporter.launch("8ray-backup.json") })
@@ -175,6 +197,10 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
                 Box {
                     IconBtn(Ico.MORE, { moreMenu = true })
                     DropdownMenu(moreMenu, { moreMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.update_all_subs)) }, onClick = {
+                            moreMenu = false
+                            if (subs.isEmpty()) Util.toast(ctx, ctx.getString(R.string.sub_none)) else updateSubs(null)
+                        })
                         DropdownMenuItem(text = { Text(stringResource(R.string.test_tcp)) }, onClick = { moreMenu = false; Tester.testTcp(shown.map { it.id }) })
                         DropdownMenuItem(text = { Text(stringResource(R.string.sort_delay)) }, onClick = { moreMenu = false; NodeStore.sortByDelay() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.sort_by)) }, onClick = {
@@ -214,7 +240,7 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
                 subs.forEach { sb -> add(sb.id to sb.name.take(18)) }
             }
             if (opts.size > 1) {
-                Chips(opts, filter, scroll = true) { filter = it }
+                Chips(opts, filter, scroll = true, onLongPress = { key -> subs.firstOrNull { it.id == key }?.let { subMenu = it } }) { filter = it }
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -259,6 +285,57 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
             text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(text, fontFamily = FontFamily.Monospace, fontSize = 11.sp) } },
             confirmButton = { TextButton({ Util.copy(ctx, "json", text); jsonFor = null }) { Text(stringResource(R.string.copy)) } },
             dismissButton = { TextButton({ jsonFor = null }) { Text(stringResource(R.string.close)) } },
+        )
+    }
+
+    subMenu?.let { sb ->
+        AlertDialog(
+            onDismissRequest = { subMenu = null }, shape = RoundedCornerShape(28.dp), containerColor = c.surfaceContainer,
+            title = { Text(sb.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            text = {
+                Column {
+                    TextButton({ subMenu = null; updateSubs(sb.id) }) { Text(stringResource(R.string.update)) }
+                    TextButton({ subMenu = null; subEdit = sb }) { Text(stringResource(R.string.edit)) }
+                    TextButton({ subMenu = null; Util.copy(ctx, "subscription", sb.url) }) { Text(stringResource(R.string.copy_sub_link)) }
+                    TextButton({ subMenu = null; subDelete = sb }) { Text(stringResource(R.string.delete), color = c.error) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton({ subMenu = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+    subEdit?.let { sb ->
+        var name by remember(sb.id) { mutableStateOf(sb.name) }
+        var url by remember(sb.id) { mutableStateOf(sb.url) }
+        AlertDialog(
+            onDismissRequest = { subEdit = null }, shape = RoundedCornerShape(28.dp), containerColor = c.surfaceContainer,
+            title = { Text(stringResource(R.string.edit)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
+                    androidx.compose.material3.OutlinedTextField(url, { url = it }, label = { Text(stringResource(R.string.link)) })
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    NodeStore.updateSub(sb.copy(name = name.trim().ifEmpty { sb.name }, url = url.trim().ifEmpty { sb.url }))
+                    subEdit = null
+                }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = { TextButton({ subEdit = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+    subDelete?.let { sb ->
+        AlertDialog(
+            onDismissRequest = { subDelete = null }, shape = RoundedCornerShape(28.dp), containerColor = c.surfaceContainer,
+            title = { Text(sb.name) }, text = { Text(stringResource(R.string.sub_delete_q)) },
+            confirmButton = { TextButton({ NodeStore.removeSub(sb.id, true); if (filter == sb.id) filter = "all"; subDelete = null }) { Text(stringResource(R.string.delete_with_configs), color = c.error) } },
+            dismissButton = {
+                Row {
+                    TextButton({ NodeStore.removeSub(sb.id, false); if (filter == sb.id) filter = "all"; subDelete = null }) { Text(stringResource(R.string.keep_configs)) }
+                    TextButton({ subDelete = null }) { Text(stringResource(R.string.cancel)) }
+                }
+            },
         )
     }
     if (confirmAll) AlertDialog(

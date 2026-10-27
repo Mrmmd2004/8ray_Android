@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package app.ray8
 
@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -277,7 +278,7 @@ fun Banner(text: String) {
 // ───────────────────────── Selection ─────────────────────────
 
 @Composable
-fun Pill(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+fun Pill(text: String, selected: Boolean, enabled: Boolean = true, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     val c = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(14.dp)
     val bg by animateColorAsState(if (selected) c.primary.copy(alpha = 0.16f) else c.surfaceContainerHigh, label = "pillBg")
@@ -285,7 +286,7 @@ fun Pill(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -
     Row(
         Modifier.alpha(if (enabled) 1f else 0.5f).clip(shape).background(bg)
             .border(1.dp, if (selected) c.primary.copy(alpha = 0.55f) else Color.Transparent, shape)
-            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
+            .combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick).padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selected) {
@@ -297,14 +298,14 @@ fun Pill(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -
 }
 
 @Composable
-fun <T> Chips(options: List<Pair<T, String>>, selected: T, enabled: Boolean = true, scroll: Boolean = false, onSelect: (T) -> Unit) {
+fun <T> Chips(options: List<Pair<T, String>>, selected: T, enabled: Boolean = true, scroll: Boolean = false, onLongPress: ((T) -> Unit)? = null, onSelect: (T) -> Unit) {
     if (scroll) {
         // One line that scrolls sideways (used for long lists such as subscriptions).
         Row(
             Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            options.forEach { (v, label) -> Pill(label, v == selected, enabled) { onSelect(v) } }
+            options.forEach { (v, label) -> Pill(label, v == selected, enabled, onLongClick = onLongPress?.let { f -> { f(v) } }) { onSelect(v) } }
         }
         return
     }
@@ -314,7 +315,7 @@ fun <T> Chips(options: List<Pair<T, String>>, selected: T, enabled: Boolean = tr
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        options.forEach { (v, label) -> Pill(label, v == selected, enabled) { onSelect(v) } }
+        options.forEach { (v, label) -> Pill(label, v == selected, enabled, onLongClick = onLongPress?.let { f -> { f(v) } }) { onSelect(v) } }
     }
 }
 
