@@ -398,6 +398,15 @@ class TunnelService : VpnService() {
         val s = SettingsStore.current
         val ms = withContext(Dispatchers.IO) { api.delay(ConfigBuilder.SELECTOR, s.testUrlOrDefault(), s.timeoutMs()) }
         Engine.log("Diag: core delay through selector = ${ms ?: "FAILED"}${if (ms == null && api.lastError.isNotEmpty()) " (${api.lastError})" else ""}")
+        if (ms == null) {
+            val tail = withContext(Dispatchers.IO) {
+                runCatching {
+                    ConfigBuilder.coreLogFile(this@TunnelService).readLines().filter { it.isNotBlank() }.takeLast(30)
+                }.getOrDefault(emptyList())
+            }
+            if (tail.isEmpty()) Engine.log("Diag: core log is empty or missing")
+            tail.forEach { Engine.log("core: " + it.take(240)) }
+        }
     }
 
     /** Auto mode: tests every config of the group now, so the best working one is used at once. */

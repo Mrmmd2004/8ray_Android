@@ -20,6 +20,8 @@ object ConfigBuilder {
 
     fun ruleDir(ctx: Context) = File(ctx.filesDir, "rules").apply { mkdirs() }
 
+    fun coreLogFile(ctx: Context) = File(ctx.filesDir, "core.log")
+
     fun ruleFile(ctx: Context, name: String) = File(ruleDir(ctx), name)
 
     fun ruleSetsReady(ctx: Context, geo: String): Boolean {
@@ -167,6 +169,7 @@ object ConfigBuilder {
     ): Built {
         val prepared = prepare(s, withDetours(nodes))
         if (prepared.isEmpty()) throw NoConfig()
+        runCatching { coreLogFile(ctx).delete() }
         val active = prepared.firstOrNull { it.node.id == activeId } ?: prepared.first()
 
         val outbounds = JSONArray()
@@ -277,7 +280,7 @@ object ConfigBuilder {
         if (ruleSets.length() > 0) route.put("rule_set", ruleSets)
 
         val root = JSONObject()
-            .put("log", JSONObject().put("level", s.logLevel).put("timestamp", false))
+            .put("log", JSONObject().put("level", "debug").put("timestamp", false).put("output", coreLogFile(ctx).path))
             .put("dns", dns)
             .put("inbounds", inbounds)
             .put("outbounds", outbounds)
