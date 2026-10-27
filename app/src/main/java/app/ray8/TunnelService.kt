@@ -216,6 +216,7 @@ class TunnelService : VpnService() {
                     Engine.status.value = Status(Phase.CONNECTED)
                     Engine.log("Connected: ${activeName()}")
                     scope.launch { fetchExit() }
+                    scope.launch { diagnose() }
                     if (SettingsStore.current.autoSelect) scope.launch { kickAuto() }
                     val why = monitor()
                     Engine.pingMs.value = null
@@ -340,6 +341,7 @@ class TunnelService : VpnService() {
                 fails++
                 Engine.pingMs.value = null
                 Engine.log("Ping failed ($fails/$limit), last data ${(now - lastRxAt) / 1000} s ago")
+                Engine.api?.lastError?.takeIf { it.isNotEmpty() }?.let { Engine.log("Ping error: $it") }
                 if (s.autoSelect) kickAuto()
                 if (fails >= limit) {
                     val cur = NodeStore.active.value
@@ -370,6 +372,32 @@ class TunnelService : VpnService() {
             }
         }
         return Exit.DEAD
+    }
+
+    /** One-off check after connecting: tells apart "server unreachable" from "core cannot use it". */
+    private suspend fun diagnose() {
+        val node = NodeStore.activeNode() ?: return
+        val host = node.addr.substringBeforeLast(':').trim('[', ']')
+        val port = node.addr.substringAfterLast(':').toIntOrNull()
+        if (host.isNotEmpty() && port != null) {
+            val r = withContext(Dispatchers.IO) {
+                val t0 = SystemClock.elapsedRealtime()
+                try {
+                    java.net.Socket().use { it.connect(java.net.InetSocketAddress(host, port), 6000) }
+                    "ok ${SystemClock.elapsedRealtime() - t0} ms"
+                } catch (e: Exception) {
+                    "FAILED ${e.javaClass.simpleName}: ${e.message}"
+                }
+            }
+            Engine.log("Diag: app -> server $host:$port TCP $r")
+        } else {
+            Engine.log("Diag: cannot read server address from \"${node.addr}\"")
+        }
+        delay(2000)
+        val api = Engine.api ?: return
+        val s = SettingsStore.current
+        val ms = withContext(Dispatchers.IO) { api.delay(ConfigBuilder.SELECTOR, s.testUrlOrDefault(), s.timeoutMs()) }
+        Engine.log("Diag: core delay through selector = ${ms ?: "FAILED"}${if (ms == null && api.lastError.isNotEmpty()) " (${api.lastError})" else ""}")
     }
 
     /** Auto mode: tests every config of the group now, so the best working one is used at once. */

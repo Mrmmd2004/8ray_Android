@@ -38,11 +38,20 @@ class ClashApi(private val port: Int, private val secret: String) {
     }
 
     /** Real delay of one outbound in ms (the request runs through that outbound), or null on failure. */
+    @Volatile var lastError: String = ""
+
     fun delay(tag: String, url: String, timeoutMs: Int): Int? = try {
         val q = "?url=" + URLEncoder.encode(url, "UTF-8") + "&timeout=$timeoutMs"
         val (code, text) = call("/proxies/${URLEncoder.encode(tag, "UTF-8")}/delay$q", timeoutMs = timeoutMs + 4000)
-        if (code == 200) JSONObject(text).optInt("delay", -1).takeIf { it > 0 } else null
-    } catch (_: Exception) {
+        if (code == 200) {
+            lastError = ""
+            JSONObject(text).optInt("delay", -1).takeIf { it > 0 }
+        } else {
+            lastError = "HTTP $code ${text.take(300)}"
+            null
+        }
+    } catch (e: Exception) {
+        lastError = e.javaClass.simpleName + ": " + (e.message ?: "")
         null
     }
 
