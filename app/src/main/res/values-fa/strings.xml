@@ -226,4 +226,11 @@
     <string name="update_all_subs">به‌روزرسانی همه ساب‌ها</string>
     <string name="copy_sub_link">کپی لینک ساب</string>
     <string name="sub_none">ساب‌اسکریپشنی وجود ندارد</string>
+    <string name="auto_from_all">انتخاب خودکار سریع‌ترین از همه کانفیگ‌ها</string>
+    <string name="auto_from_sub">انتخاب خودکار سریع‌ترین از این ساب</string>
+    <string name="auto_off">خاموش کردن انتخاب خودکار</string>
+    <string name="auto_scope_hint">سریع‌ترین از: %1$s</string>
+    <string name="auto_scope_all">همه کانفیگ‌ها</string>
+    <string name="auto_mode_auto">خودکار (همه کانفیگ‌ها)</string>
+    <string name="auto_mode_manual">دستی (انتخاب ساب)</string>
 </resources>

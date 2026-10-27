@@ -14,6 +14,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -167,12 +170,13 @@ private fun Root(onLanguageChanged: () -> Unit) {
             Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(glow.copy(alpha = 0.10f), Color.Transparent), endY = 900f))
         ) {
             Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).then(if (screen <= SETTINGS) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier)) {
+                Box(Modifier.weight(1f)) {
                     AnimatedContent(
                         targetState = screen,
                         transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
                         label = "nav"
                     ) { sc ->
+                        Box(Modifier.fillMaxSize().then(if (sc <= SETTINGS) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier)) {
                         when (sc) {
                             HOME -> HomeScreen(openConfigs = { go(CONFIGS) }, openLogs = { go(LOGS) }, openRouting = { go(ROUTING) })
                             CONFIGS -> ConfigsScreen(
@@ -189,9 +193,14 @@ private fun Root(onLanguageChanged: () -> Unit) {
                             ROUTING -> RoutingScreen(back = ::back)
                             SUBS -> SubsScreen(back = ::back)
                         }
+                        }
                     }
                 }
-                if (screen <= SETTINGS) BottomBar(screen) { go(it) }
+                AnimatedVisibility(
+                    visible = screen <= SETTINGS,
+                    enter = fadeIn(tween(200)) + expandVertically(tween(200)),
+                    exit = fadeOut(tween(120)) + shrinkVertically(tween(200)),
+                ) { BottomBar(screen) { go(it) } }
             }
         }
     }

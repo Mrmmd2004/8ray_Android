@@ -95,6 +95,7 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
     val exit by Engine.exitInfo.collectAsStateWithLifecycle()
     val speed by Engine.speedBps.collectAsStateWithLifecycle()
     val nodes by NodeStore.nodes.collectAsStateWithLifecycle()
+    val allSubs by NodeStore.subs.collectAsStateWithLifecycle()
     val activeId by NodeStore.active.collectAsStateWithLifecycle()
     val reason by Engine.lastReason.collectAsStateWithLifecycle()
     val active = nodes.firstOrNull { it.id == activeId }
@@ -119,7 +120,7 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
                 else Socks.httpGet(Engine.internalPort, "cp.cloudflare.com", "/generate_204", 8000)?.first?.toInt()
             }
             if (ms != null) Engine.pingMs.value = ms
-            testResult = ms?.let { ctx.getString(R.string.ms_fmt, it) } ?: failedText
+            testResult = if (ms != null) null else failedText
             testing = false
         }
     }
@@ -277,7 +278,7 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        if (s.autoSelect) stringResource(R.string.auto_select_hint) else active?.let { it.kind + "  ·  " + it.addr } ?: stringResource(R.string.add_first),
+                        if (s.autoSelect) stringResource(R.string.auto_scope_hint, allSubs.firstOrNull { it.id == s.autoScope }?.name ?: stringResource(R.string.auto_scope_all)) else active?.let { it.kind + "  ·  " + it.addr } ?: stringResource(R.string.add_first),
                         fontSize = 12.sp, color = c.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -332,6 +333,21 @@ fun HomeScreen(openConfigs: () -> Unit, openLogs: () -> Unit, openRouting: () ->
                 ) { v -> if (s.vpnMode != v) SettingsStore.update { it.copy(vpnMode = v) } }
                 if (!idle) Hint(stringResource(R.string.locked_hint))
                 SwitchRow(stringResource(R.string.auto_select_fastest), s.autoSelect) { TunnelService.setAuto(ctx, it) }
+                if (s.autoSelect) {
+                    val manualScope = s.autoScope != "all" && allSubs.any { it.id == s.autoScope }
+                    Segmented(
+                        listOf(false to stringResource(R.string.auto_mode_auto), true to stringResource(R.string.auto_mode_manual)),
+                        manualScope,
+                    ) { manual ->
+                        if (manual == manualScope) return@Segmented
+                        if (!manual) TunnelService.setAuto(ctx, true, "all")
+                        else if (allSubs.isEmpty()) Util.toast(ctx, ctx.getString(R.string.sub_none))
+                        else TunnelService.setAuto(ctx, true, allSubs.first().id)
+                    }
+                    if (manualScope) {
+                        Chips(allSubs.map { it.id to it.name.take(18) }, s.autoScope, scroll = true) { id -> TunnelService.setAuto(ctx, true, id) }
+                    }
+                }
             }
         }
 

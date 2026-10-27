@@ -93,6 +93,7 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
     var jsonFor by remember { mutableStateOf<Node?>(null) }
     var working by remember { mutableStateOf(false) }
     var subMenu by remember { mutableStateOf<Sub?>(null) }
+    var allMenu by remember { mutableStateOf(false) }
     var subEdit by remember { mutableStateOf<Sub?>(null) }
     var subDelete by remember { mutableStateOf<Sub?>(null) }
 
@@ -234,13 +235,13 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
         Spacer(Modifier.height(8.dp))
         if (nodes.isNotEmpty()) {
             val opts = buildList {
-                add("all" to stringResource(R.string.filter_all) + " (${nodes.size})")
+                add("all" to (if (s.autoSelect && s.autoScope == "all") "⚡ " else "") + stringResource(R.string.filter_all) + " (${nodes.size})")
                 if (nodes.any { it.fav }) add("fav" to "★")
                 if (subs.isNotEmpty() && nodes.any { it.sub.isEmpty() }) add("manual" to stringResource(R.string.filter_manual))
-                subs.forEach { sb -> add(sb.id to sb.name.take(18)) }
+                subs.forEach { sb -> add(sb.id to (if (s.autoSelect && s.autoScope == sb.id) "⚡ " else "") + sb.name.take(18)) }
             }
             if (opts.size > 1) {
-                Chips(opts, filter, scroll = true, onLongPress = { key -> subs.firstOrNull { it.id == key }?.let { subMenu = it } }) { filter = it }
+                Chips(opts, filter, scroll = true, onLongPress = { key -> if (key == "all") allMenu = true else subs.firstOrNull { it.id == key }?.let { subMenu = it } }) { filter = it }
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -288,12 +289,28 @@ fun ConfigsScreen(openSubs: () -> Unit, openRouting: () -> Unit, openLogs: () ->
         )
     }
 
+    if (allMenu) {
+        AlertDialog(
+            onDismissRequest = { allMenu = false }, shape = RoundedCornerShape(28.dp), containerColor = c.surfaceContainer,
+            title = { Text(stringResource(R.string.filter_all)) },
+            text = {
+                Column {
+                    TextButton({ allMenu = false; TunnelService.setAuto(ctx, true, "all") }) { Text(stringResource(R.string.auto_from_all)) }
+                    if (s.autoSelect) TextButton({ allMenu = false; TunnelService.setAuto(ctx, false) }) { Text(stringResource(R.string.auto_off)) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton({ allMenu = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
     subMenu?.let { sb ->
         AlertDialog(
             onDismissRequest = { subMenu = null }, shape = RoundedCornerShape(28.dp), containerColor = c.surfaceContainer,
             title = { Text(sb.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             text = {
                 Column {
+                    TextButton({ subMenu = null; TunnelService.setAuto(ctx, true, sb.id) }) { Text(stringResource(R.string.auto_from_sub)) }
+                    if (s.autoSelect) TextButton({ subMenu = null; TunnelService.setAuto(ctx, false) }) { Text(stringResource(R.string.auto_off)) }
                     TextButton({ subMenu = null; updateSubs(sb.id) }) { Text(stringResource(R.string.update)) }
                     TextButton({ subMenu = null; subEdit = sb }) { Text(stringResource(R.string.edit)) }
                     TextButton({ subMenu = null; Util.copy(ctx, "subscription", sb.url) }) { Text(stringResource(R.string.copy_sub_link)) }

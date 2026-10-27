@@ -226,4 +226,11 @@
     <string name="update_all_subs">Update all subscriptions</string>
     <string name="copy_sub_link">Copy subscription link</string>
     <string name="sub_none">No subscriptions</string>
+    <string name="auto_from_all">Auto-select fastest from all configs</string>
+    <string name="auto_from_sub">Auto-select fastest from this subscription</string>
+    <string name="auto_off">Turn off auto-select</string>
+    <string name="auto_scope_hint">Fastest of: %1$s</string>
+    <string name="auto_scope_all">all configs</string>
+    <string name="auto_mode_auto">Auto (all configs)</string>
+    <string name="auto_mode_manual">Manual (pick subscription)</string>
 </resources>

@@ -709,8 +709,8 @@ class TunnelService : VpnService() {
         }
 
         /** Turns "auto select fastest" on or off; the core is rebuilt because the group is part of the config. */
-        fun setAuto(ctx: Context, on: Boolean) {
-            SettingsStore.update { it.copy(autoSelect = on) }
+        fun setAuto(ctx: Context, on: Boolean, scope: String? = null) {
+            SettingsStore.update { it.copy(autoSelect = on, autoScope = scope ?: it.autoScope) }
             if (Engine.status.value.phase == Phase.CONNECTED) restart(ctx.applicationContext)
         }
     }

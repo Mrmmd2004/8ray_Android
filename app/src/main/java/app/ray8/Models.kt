@@ -73,6 +73,7 @@ data class Settings(
 
     // Which config is used
     val autoSelect: Boolean = false,      // urltest group: always the fastest of the best configs
+    val autoScope: String = "all",        // "all" or the id of a subscription: where the fastest config is picked from
     val autoCount: Int = 20,              // how many configs the auto group tests
     val autoSwitch: Boolean = true,       // move to another config when the current one is dead
     val pingFails: Int = 3,               // failed probes in a row before the link counts as dead
@@ -172,6 +173,7 @@ object SettingsStore {
                 autoStart = bool("autoStart", d.autoStart),
                 keepAwake = bool("keepAwake", d.keepAwake),
                 autoSelect = bool("autoSelect", d.autoSelect),
+                autoScope = str("autoScope", d.autoScope),
                 autoCount = int("autoCount", d.autoCount),
                 autoSwitch = bool("autoSwitch", d.autoSwitch),
                 pingFails = int("pingFails", d.pingFails),
@@ -215,7 +217,7 @@ object SettingsStore {
             .putString("language", s.language).putString("theme", s.theme)
             .putBoolean("dynamicColor", s.dynamicColor).putBoolean("vpnMode", s.vpnMode)
             .putBoolean("autoStart", s.autoStart).putBoolean("keepAwake", s.keepAwake)
-            .putBoolean("autoSelect", s.autoSelect).putInt("autoCount", s.autoCount)
+            .putBoolean("autoSelect", s.autoSelect).putString("autoScope", s.autoScope).putInt("autoCount", s.autoCount)
             .putBoolean("autoSwitch", s.autoSwitch).putInt("pingFails", s.pingFails)
             .putInt("pingIntervalSec", s.pingIntervalSec).putString("testUrl", s.testUrl)
             .putInt("testTimeoutMs", s.testTimeoutMs).putInt("testWorkers", s.testWorkers)
@@ -270,7 +272,7 @@ object SettingsStore {
     }
 
     private val save0Keys = setOf(
-        "language", "theme", "dynamicColor", "vpnMode", "autoStart", "keepAwake", "autoSelect", "autoCount",
+        "language", "theme", "dynamicColor", "vpnMode", "autoStart", "keepAwake", "autoSelect", "autoScope", "autoCount",
         "autoSwitch", "pingFails", "pingIntervalSec", "testUrl", "testTimeoutMs", "testWorkers", "socksPort",
         "allowLan", "proxyUser", "proxyPass", "ipv6", "tunStack", "tunMtu", "blockQuic", "sniffing", "remoteDns",
         "directDns", "bypassLan", "bypassGeo", "routeProxy", "routeDirect", "routeBlock", "mux", "muxProtocol",

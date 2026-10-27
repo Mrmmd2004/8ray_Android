@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -69,10 +72,13 @@ fun SettingsScreen(
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
-        Text(
-            stringResource(R.string.settings), Modifier.padding(top = 8.dp, bottom = 4.dp),
-            style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-        )
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.settings), Modifier.weight(1f),
+                style = androidx.compose.material3.MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+            )
+            IconBtn(Ico.INFO, { openAbout() })
+        }
 
         Group(stringResource(R.string.sec_main)) {
             ActionRow(Ico.REFRESH, stringResource(R.string.subscriptions)) { openSubs() }
@@ -180,9 +186,6 @@ fun SettingsScreen(
 
         if (!idle) Hint(stringResource(R.string.restart_note))
 
-        Group(stringResource(R.string.about)) {
-            ActionRow(Ico.INFO, stringResource(R.string.app_name) + "  ·  v" + BuildConfig.VERSION_NAME) { openAbout() }
-        }
         Spacer(Modifier.height(28.dp))
     }
 }

@@ -182,11 +182,13 @@ object ConfigBuilder {
 
         val selectable = ArrayList<String>()
         if (s.autoSelect) {
-            val pool = prepared
+            val scoped = if (s.autoScope != "all") prepared.filter { it.node.sub == s.autoScope } else prepared
+            val base = scoped.ifEmpty { prepared }
+            val pool = base
                 .filter { it.node.delay != -1 }
                 .sortedBy { it.node.delay ?: Int.MAX_VALUE }
                 .take(s.autoN())
-                .ifEmpty { prepared.take(s.autoN()) }
+                .ifEmpty { base.take(s.autoN()) }
             outbounds.put(
                 JSONObject().put("type", "urltest").put("tag", AUTO)
                     .put("outbounds", JSONArray(pool.map { it.node.id }))
@@ -280,7 +282,7 @@ object ConfigBuilder {
         if (ruleSets.length() > 0) route.put("rule_set", ruleSets)
 
         val root = JSONObject()
-            .put("log", JSONObject().put("level", "debug").put("timestamp", false).put("output", coreLogFile(ctx).path))
+            .put("log", JSONObject().put("level", s.logLevel).put("timestamp", false).put("output", coreLogFile(ctx).path))
             .put("dns", dns)
             .put("inbounds", inbounds)
             .put("outbounds", outbounds)

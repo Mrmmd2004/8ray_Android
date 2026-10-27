@@ -12,18 +12,26 @@ android {
         applicationId = "app.ray8"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Every CI run gets a higher versionCode, so a new build can always be installed over the old one.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.let { 1000 + it } ?: 8
+        versionName = "0.8"
     }
 
+    // One fixed key for every build: Android only installs an update when it is signed with the same key
+    // as the installed app. A KEYSTORE_FILE (GitHub secret) wins; otherwise the keystore in this repo is used.
     val ksPath = System.getenv("KEYSTORE_FILE")
     signingConfigs {
-        if (ksPath != null && file(ksPath).exists()) {
-            create("release") {
+        create("release") {
+            if (ksPath != null && file(ksPath).exists()) {
                 storeFile = file(ksPath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                storeFile = file("8ray-release.keystore")
+                storePassword = "8ray-keystore"
+                keyAlias = "8ray"
+                keyPassword = "8ray-keystore"
             }
         }
     }
@@ -33,8 +41,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Falls back to the debug key when no release keystore is provided.
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
