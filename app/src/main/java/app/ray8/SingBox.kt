@@ -170,15 +170,48 @@ object SingBox {
 
         override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
             release()
+            // Always report the real Wi-Fi / mobile network, never the VPN itself: with the TUN up, the
+            // system "default network" can be the VPN, and then the core finds no interface to dial from.
             val cb = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) = report(network, listener)
-                override fun onLinkPropertiesChanged(network: Network, lp: android.net.LinkProperties) = report(network, listener)
-                override fun onLost(network: Network) {
-                    runCatching { listener.updateDefaultInterface("", -1, false, false) }
-                }
+                override fun onAvailable(network: Network) = reportPhysical(listener)
+                override fun onLinkPropertiesChanged(network: Network, lp: android.net.LinkProperties) = reportPhysical(listener)
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = reportPhysical(listener)
+                override fun onLost(network: Network) = reportPhysical(listener)
             }
             callback = cb
-            runCatching { cm.registerDefaultNetworkCallback(cb) }
+            reportPhysical(listener)
+            runCatching {
+                cm.registerNetworkCallback(
+                    android.net.NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), cb,
+                )
+            }
+        }
+
+        private fun pickPhysical(): Network? {
+            val list = cm.allNetworks.filter { n ->
+                val c = cm.getNetworkCapabilities(n) ?: return@filter false
+                c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) && !c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+            }
+            fun score(n: Network): Int {
+                val c = cm.getNetworkCapabilities(n) ?: return 0
+                var v = 0
+                if (c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) v += 4
+                if (c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || c.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) v += 2
+                if (c.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) v += 1
+                return v
+            }
+            return list.maxByOrNull { score(it) }
+        }
+
+        private fun reportPhysical(listener: InterfaceUpdateListener) {
+            runCatching {
+                val n = pickPhysical()
+                if (n == null) {
+                    listener.updateDefaultInterface("", -1, false, false)
+                } else {
+                    report(n, listener)
+                }
+            }
         }
 
         private fun report(network: Network, listener: InterfaceUpdateListener) {
